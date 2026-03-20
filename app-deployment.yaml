@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: spring-webapp
-        image: spring-webapp:v1
+        image: spring-webapp:v2
         imagePullPolicy: Never # Tells K8s to use the sideloaded image, not the internet
         ports:
         - containerPort: 9443 # Your exotic port
