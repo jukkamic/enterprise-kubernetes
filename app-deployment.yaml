@@ -1,0 +1,39 @@
+---
+# 1. The Deployment (The Pods running your Java app)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spring-webapp
+spec:
+  replicas: 2 # Running two copies for corporate High Availability!
+  selector:
+    matchLabels:
+      app: spring-webapp
+  template:
+    metadata:
+      labels:
+        app: spring-webapp
+    spec:
+      containers:
+      - name: spring-webapp
+        image: spring-webapp:v1
+        imagePullPolicy: Never # Tells K8s to use the sideloaded image, not the internet
+        ports:
+        - containerPort: 9443 # Your exotic port
+        env:
+        - name: SERVER_PORT
+          value: "9443"
+
+---
+# 2. The Service (The stable internal network address)
+apiVersion: v1
+kind: Service
+metadata:
+  name: spring-boot-service # This MUST match what you put in Cloudflare!
+spec:
+  selector:
+    app: spring-webapp
+  ports:
+    - protocol: TCP
+      port: 9443
+      targetPort: 9443
