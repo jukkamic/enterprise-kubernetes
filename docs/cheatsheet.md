@@ -1,4 +1,4 @@
-Here is your official Weekend Warrior Kubernetes Cheat Sheet. Keep this handy so when your friend creates a completely different app to test the scaffolding tools, they can spin up the entire environment and get routing established in under five minutes.
+The official Weekend Warrior Kubernetes Cheat Sheet.
 
 ---
 
@@ -50,6 +50,8 @@ Here is your official Weekend Warrior Kubernetes Cheat Sheet. Keep this handy so
    ```
 4. **Deploy Application (from enterprise-kubernetes folder):**
    ```bash
+   kubectl apply -f postgres-secret.yaml
+   kubectl apply -f postgres-infra.yaml
    kubectl apply -f app-deployment.yaml
    ```
 
@@ -64,9 +66,3 @@ Here is your official Weekend Warrior Kubernetes Cheat Sheet. Keep this handy so
    ```bash
    wsl --shutdown
    ```
-
----
-
-You have officially conquered Windows networking, Docker limitations, and Kubernetes routing all in one go. 
-
-**Now that your infrastructure is documented and securely torn down, are you ready to close the terminal and enjoy the rest of your Friday night?**
