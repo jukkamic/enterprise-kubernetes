@@ -54,7 +54,7 @@ Followed these instructions from Gemini:
 > 
 > Zero Trust: Map spring-app.yourdomain.com directly to your internal K8s service. No ports to open, no cost for static IPs.
 
-I had to create an account in Cloudflare, add Zerotrust (chose the free plan when prompted), named it ```scaffoldkit```, then created a tunnel and named it ```weekend-warrior-lab```.
+I had to create an account in Cloudflare, add Zerotrust (chose the free plan when prompted), named it ```scaffoldkit```, then created a tunnel (select "cloudflared") and named it ```weekend-warrior-lab```.
 
 Cloudflare guided me to download something and run an installer. I ***saved the given token*** (offline). Running  ```cloudflared.exe service install <token>``` is not needed because the tunnel will run as a container inside the cluster, not as a service on the underlying bare-metal server.
 
