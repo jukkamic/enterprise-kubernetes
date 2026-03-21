@@ -66,3 +66,13 @@ The official Weekend Warrior Kubernetes Cheat Sheet.
    ```bash
    wsl --shutdown
    ```
+
+### Or just Docker stop
+
+```bash
+docker stop kind-control-plane kind-worker kind-worker2
+```
+
+```bash
+docker start kind-control-plane kind-worker kind-worker2
+```
