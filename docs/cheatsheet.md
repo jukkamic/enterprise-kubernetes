@@ -42,11 +42,11 @@ Here is your official Weekend Warrior Kubernetes Cheat Sheet. Keep this handy so
    ```
 2. **Build the Docker Image:**
    ```bash
-   docker build -t spring-webapp:v2 .
+   docker build -t spring-webapp:v3 .
    ```
 3. **Sideload Image into Cluster:**
    ```bash
-   kind load docker-image spring-webapp:v2 --name hybrid-lab
+   kind load docker-image spring-webapp:v3 --name hybrid-lab
    ```
 4. **Deploy Application (from enterprise-kubernetes folder):**
    ```bash

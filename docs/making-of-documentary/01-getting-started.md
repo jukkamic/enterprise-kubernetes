@@ -102,7 +102,7 @@ Created Dockerfile and ran
 
 ```bash
 docker build -t spring-webapp:v1 .
-kind load docker-image spring-webapp:v2 --name hybrid-lab
+kind load docker-image spring-webapp:v3 --name hybrid-lab
 ```
 
 Created app-deployment.yaml file and applied it to the cluster.
@@ -184,4 +184,13 @@ Verify and view
 
 ```bash
 kubectl get pods -n azure-arc
+```
+
+## Phase 9: Single source of truth -- PostgreSQL 
+
+Create postgres-secret.yaml from the example file and apply:
+
+```bash
+kubectl apply -f postgres-secret.yaml
+kubectl apply -f postgres-infra.yaml
 ```
