@@ -90,36 +90,7 @@ kind create cluster --config kind-config.yaml --name hybrid-lab
 
 ## Phase 5: Creating the Cloudflare tunnel
 
-create cloudflare-tunnel.yaml
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: cloudflared
-  labels:
-    app: cloudflared
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      pod: cloudflared
-  template:
-    metadata:
-      labels:
-        pod: cloudflared
-    spec:
-      containers:
-      - name: cloudflared
-        image: cloudflare/cloudflared:latest
-        args:
-        - tunnel
-        - --no-autoupdate
-        - run
-        env:
-        - name: TUNNEL_TOKEN
-          value: "PASTE_YOUR_MASSIVE_TOKEN_HERE"
-```
+create cloudflare-tunnel.yaml from the .example file. Then apply the tunnel.
 
 ```powershell
 kubectl apply -f cloudflare-tunnel.yaml
