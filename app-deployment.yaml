@@ -15,14 +15,33 @@ spec:
         app: spring-webapp
     spec:
       containers:
-      - name: spring-webapp
-        image: spring-webapp:v2
-        imagePullPolicy: Never # Tells K8s to use the sideloaded image, not the internet
-        ports:
-        - containerPort: 9443 # Your exotic port
-        env:
-        - name: SERVER_PORT
-          value: "9443"
+        - name: spring-webapp
+          image: spring-webapp:v3
+          imagePullPolicy: Never # Tells K8s to use the sideloaded image, not the internet
+          ports:
+            - containerPort: 9443 # Your exotic port
+          env:
+            - name: SERVER_PORT
+              value: "9443"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres-service:5432/springdb"
+            - name: SPRING_DATASOURCE_DRIVER_CLASS_NAME
+              value: "org.postgresql.Driver"
+            - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+              value: "update"
+            - name: SPRING_JPA_DATABASE_PLATFORM
+              value: "org.hibernate.dialect.PostgreSQLDialect"
+            # Securely pulling the credentials from the Kubernetes Secret
+            - name: DB_USERNAME 
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
 
 ---
 # 2. The Service (The stable internal network address)
