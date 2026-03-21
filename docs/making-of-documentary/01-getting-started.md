@@ -17,7 +17,7 @@ Some steps require creating config files which are found in this Git repository 
 Create a Multi-Node Cluster:
 A single node isn't "corporate." Create a config file kind-config.yaml:
 
-```powershell
+```bash
 kind create cluster --config kind-config.yaml
 ```
 
@@ -58,12 +58,12 @@ I had to create an account in Cloudflare, add Zerotrust (chose the free plan whe
 
 Cloudflare guided me to download something and run an installer. I ***saved the given token*** (offline). Running  ```cloudflared.exe service install <token>``` is not needed because the tunnel will run as a container inside the cluster, not as a service on the underlying bare-metal server.
 
-```powershell
+```bash
 kind create cluster --config kind-config.yaml --name hybrid-lab
 ```
 While the cluster is being created run export config and check the status
 
-```powershell
+```bash
 kind export kubeconfig --name hybrid-lab
 kubectl get nodes
 ```
@@ -83,7 +83,7 @@ It tells the WSL kernel: "Do not load v1 under any circumstances."
 
 Then kill all Docker processes and run ```wsl --update``` and ```wsl --shutdown``` and wait 10 seconds before restarting WSL before restarting Docker.
 
-```powershell
+```bash
 kind delete cluster --name hybrid-lab
 kind create cluster --config kind-config.yaml --name hybrid-lab
 ```
@@ -92,7 +92,7 @@ kind create cluster --config kind-config.yaml --name hybrid-lab
 
 create cloudflare-tunnel.yaml from the .example file. Then apply the tunnel.
 
-```powershell
+```bash
 kubectl apply -f cloudflare-tunnel.yaml
 ```
 
@@ -100,20 +100,20 @@ kubectl apply -f cloudflare-tunnel.yaml
 
 Created Dockerfile and ran 
 
-```powershell
+```bash
 docker build -t spring-webapp:v1 .
-kind load docker-image spring-webapp:v1 --name hybrid-lab
+kind load docker-image spring-webapp:v2 --name hybrid-lab
 ```
 
-Created app-deployment.yaml.
+Created app-deployment.yaml file and applied it to the cluster.
 
-```powershell
+```bash
 kubectl apply -f app-deployment.yaml
 ```
 
 ### Problems
 
-```powershell
+```bash
 kubectl get pods
 kubectl logs spring-webapp-678669b6b-2tf68
 ```
@@ -143,3 +143,45 @@ This instantly kills the Linux virtual machine and hands the 8GB of RAM back to 
    
 This wipes out the cluster, the pods, and the tunnel. When your friend creates that completely different app to test the scaffolding tools later, you can just run your kind create and kubectl apply commands to build a fresh bunker in about 60 seconds.
 
+
+## Phase 8: Extra feature Azure Arc
+
+```bash
+az login
+```
+
+if you get an error message grab the tenant id from it and do 
+
+```bash
+az login --tenant <TENANT_ID> --use-device-code
+```
+
+```bash
+az extension add --name connectedk8s
+az extension add --name k8s-extension
+```
+Register Azure Providers
+
+```bash
+az provider register --namespace Microsoft.Kubernetes ; az provider register --namespace Microsoft.KubernetesConfiguration ; az provider register --namespace Microsoft.ExtendedLocation --wait
+```
+
+Note: This step happens entirely on Microsoft's end and can take 3 to 10 minutes. You can check the status by running az provider show -n Microsoft.Kubernetes -o table. Wait until it says Registered before moving on.
+
+Create home for your cluster
+
+```bash
+az group create --name Arc-Interview-Demo --location eastus
+```
+
+Deploy Azure Arc agents (pods) in to your kind cluster and establish an encrypted outbound tunnel to Azure
+
+```bash
+az connectedk8s connect --name my-kind-cluster --resource-group Arc-Interview-Demo
+```
+
+Verify and view
+
+```bash
+kubectl get pods -n azure-arc
+```
