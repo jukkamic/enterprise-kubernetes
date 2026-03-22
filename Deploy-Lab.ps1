@@ -3,6 +3,7 @@ $RG_NAME = "Hybrid-Lab"
 $CLUSTER_NAME = "hobby-lab"
 $LOCATION = "northeurope"
 $GIT_URL = "https://github.com/jukkamic/enterprise-kubernetes.git"
+$GIT_BRANCH = "feat/arc-flow"
 
 Write-Host "🚀 Starting Hybrid-Lab reconstruction..." -ForegroundColor Cyan
 
@@ -24,12 +25,16 @@ az connectedk8s connect `
 
 # 3. Install the Flux Extension (The GitOps Brain)
 Write-Host "🧠 Installing Flux Extension..." -ForegroundColor Cyan
-az k8s-extension create `
+az k8s-configuration flux create `
     --resource-group $RG_NAME `
     --cluster-name $CLUSTER_NAME `
     --cluster-type connectedClusters `
-    --extension-type microsoft.flux `
-    --name flux-engine
+    --name lab-sync `
+    --namespace flux-system `
+    --url $GIT_URL `
+    --branch $GIT_BRANCH `
+    --scope cluster `
+    --kustomization name=infra path=./lab-cluster prune=true
 
 # 4. Apply your Cloudflare Tunnel & App Config via GitOps
 Write-Host "📦 Syncing manifests from Git..." -ForegroundColor Cyan
