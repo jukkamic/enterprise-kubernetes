@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# List ONLY the files you want Flux to deploy
+resources:
+  - postgres-secret.yaml
+  - postgres-infra.yaml
+  - cloudflare-tunnel.yaml
+  - app-deployment.yaml
+
+commonLabels:
+  managed-by: azure-arc-flux
+  env: hobby-lab
