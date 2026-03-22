@@ -30,6 +30,7 @@ az config set extension.dynamic_install_allow_preview=true
 **The extensions and providers**
 
 ```bash
+az k8s-extension create --name akv-secret-provider --cluster-name hobby-lab --resource-group Hybrid-Lab --cluster-type connectedClusters --extension-type Microsoft.AzureKeyVaultSecretsProvider
 az provider register --namespace Microsoft.OperationalInsights
 az provider register --namespace Microsoft.KeyVault
 ```
