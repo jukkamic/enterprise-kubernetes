@@ -1,4 +1,3 @@
-# --- Default Parameters ---
 $RG_NAME = "Hybrid-Lab"
 $CLUSTER_NAME = "hobby-lab"
 $LOCATION = "northeurope"
@@ -12,7 +11,7 @@ $existingClusters = kind get clusters
 if ($existingClusters -contains $CLUSTER_NAME) {
     Write-Host "✅ Kind cluster '$CLUSTER_NAME' already exists locally." -ForegroundColor Green
 } else {
-    Write-Host "Creating Kind cluster..." -ForegroundColor Yellow
+    Write-Host "🏗️ Creating Kind cluster..." -ForegroundColor Yellow
     kind create cluster --name $CLUSTER_NAME
 }
 
@@ -25,6 +24,24 @@ az connectedk8s connect `
 
 # 3. Install the Flux Extension (The GitOps Brain)
 Write-Host "🧠 Installing Flux Extension..." -ForegroundColor Cyan
+az k8s-extension create `
+    --resource-group $RG_NAME `
+    --cluster-name $CLUSTER_NAME `
+    --cluster-type connectedClusters `
+    --extension-type microsoft.flux `
+    --name flux-engine
+
+# 4. Install Monitoring Extension
+Write-Host "📊 Enabling Cloud Monitoring..." -ForegroundColor Cyan
+az k8s-extension create `
+    --name azuremonitor-containers `
+    --cluster-name $CLUSTER_NAME `
+    --resource-group $RG_NAME `
+    --cluster-type connectedClusters `
+    --extension-type Microsoft.AzureMonitor.Containers
+
+# 5. Create GitOps Configuration
+Write-Host "📦 Pointing Arc to your GitHub lab-cluster folder..." -ForegroundColor Cyan
 az k8s-configuration flux create `
     --resource-group $RG_NAME `
     --cluster-name $CLUSTER_NAME `
@@ -36,27 +53,5 @@ az k8s-configuration flux create `
     --scope cluster `
     --kustomization name=infra path=./lab-cluster prune=true
 
-# 4. Apply your Cloudflare Tunnel & App Config via GitOps
-Write-Host "📦 Syncing manifests from Git..." -ForegroundColor Cyan
-az k8s-configuration flux create `
-    --resource-group $RG_NAME `
-    --cluster-name $CLUSTER_NAME `
-    --cluster-type connectedClusters `
-    --name lab-sync `
-    --namespace flux-system `
-    --url $GIT_URL `
-    --scope cluster `
-    --kustomization name=infra path=./lab-cluster prune=true
-
-# 5. Enable Monitoring (Container Insights)
-Write-Host "📊 Enabling Cloud Monitoring..." -ForegroundColor Cyan
-
-# This installs the Azure Monitor agent into your Kind cluster
-az k8s-extension create `
-    --name azuremonitor-containers `
-    --cluster-name $CLUSTER_NAME `
-    --resource-group $RG_NAME `
-    --cluster-type connectedClusters `
-    --extension-type Microsoft.AzureMonitor.Containers    
-
-Write-Host "✨ Lab is ready! Check the Azure Portal to see your 'Hybrid-Lab' status." -ForegroundColor Green
+Write-Host "✨ Lab is ready! Check the Azure Portal to see your Hybrid-Lab status." -ForegroundColor Green
+Write-Host "Check your Azure Portal in ~5 mins to see your Spring Boot app and monitoring data." -ForegroundColor White
