@@ -21,7 +21,7 @@ spec:
               mountPath: "/mnt/secrets-store"
               readOnly: true
           image: spring-webapp:v3
-          imagePullPolicy: Never # Tells K8s to use the sideloaded image, not the internet
+          imagePullPolicy: Always # Tells K8s to use the sideloaded image, not the internet
           ports:
             - containerPort: 9443 # Your exotic port
           env:
