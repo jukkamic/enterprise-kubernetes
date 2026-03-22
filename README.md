@@ -1,130 +1,209 @@
-# Enterprise Kubernetes Lab: Spring Boot, Azure Arc & PostgreSQL
+# Enterprise Kubernetes Local Lab (Kind + Azure Arc + Key Vault + Flux)
 
-A corporate-realistic Kubernetes environment designed to bridge local development with enterprise cloud patterns. This project serves as an advanced sandbox to explore Kubernetes (K8s) management, highly-available deployments, hybrid-cloud connectivity, and GitOps secrets management.
+Welcome to the Enterprise Kubernetes Local Lab! This guide walks you through setting up a robust, locally hosted Kubernetes cluster that behaves like a production-grade enterprise environment.
 
-## 🏗️ Architecture
+We are using **Kind (Kubernetes IN Docker)** on Windows, but managing it exactly as you would a remote production cluster. By integrating **Azure Arc**, **Flux (GitOps)**, **Azure Key Vault**, and **Cloudflare Tunnels**, this lab bridges the gap between local development and enterprise infrastructure.
 
-* **Local Infrastructure:** [Kind](https://kind.sigs.k8s.io/) (Kubernetes in Docker) running a multi-node topology (1 Control Plane, 2 Worker Nodes).
-* **Cloud Control Plane:** [Azure Arc](https://azure.microsoft.com/en-us/products/azure-arc/) for centralized management, resource inventory, and observability from the cloud.
-* **Application Stack:** Java Spring Boot web application (Stateless, running 2 Replicas for High Availability).
-* **Data Layer:** Centralized PostgreSQL Database deployed within the cluster to resolve "split-brain" session inconsistencies.
-* **Ingress / Network:** [Cloudflare Tunnel](https://www.cloudflare.com/products/tunnel/) (`cloudflared`) for secure, zero-trust internet access to the local cluster without opening firewall ports.
+*(Note: Earlier iterations of this project relied on local secret files and imperative deployment scripts like `Deploy-Lab.ps1`. We have since migrated fully to GitOps with Flux and centralized secret management with Azure Key Vault. You can safely ignore legacy scripts or local secret placeholders.)*
 
-## 🎯 Project Achievements
+## 📋 Prerequisites
 
-1. Provisioned a multi-node local cluster using `kind` to simulate a true distributed environment.
-2. Successfully tethered the local cluster to the Azure Cloud using Azure Arc (`connectedk8s`).
-3. Containerized a Java Spring Boot application and deployed it across multiple worker nodes.
-4. Diagnosed and resolved a "split-brain" application state by migrating from local H2 databases to a centralized, in-cluster PostgreSQL deployment.
-5. Secured database credentials using Kubernetes `Secrets` and the GitOps "Split and Ignore" methodology.
-6. Implemented Cloudflare Tunnels to securely expose the application to the public internet with automated load-balancing across pods.
+Before you start, ensure you have the following accounts and CLI tools installed on your Windows machine. **We will be using PowerShell for these steps.**
 
-## 🚀 Getting Started
+### Accounts & Services
 
-### Prerequisites
+* **GitHub Account**: To host your repository for Flux GitOps.
+* **Azure Account**: With an active subscription for Arc and Key Vault.
+* **Cloudflare Account & Domain**: To expose your services securely without port forwarding.
 
-* Docker Desktop / Rancher Desktop
-* [Kind CLI](https://kind.sigs.k8s.io/docs/user/quick-start/)
-* [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli)
-* Java 17+ & Maven
+### Command Line Tools (Windows)
 
-### 1. Provision the Infrastructure
+Ensure these are in your system PATH:
+* **Docker Desktop**: Running and configured for Linux containers (allocate at least 4GB RAM).
+* **Kind**: To spin up the local cluster.
+* **kubectl**: To interact with the cluster.
+* **Helm**: To install Kubernetes packages.
+* **Flux CLI**: To bootstrap GitOps (`choco install flux`).
+* **Azure CLI (`az`)**: For Azure resource management.
 
-Spin up the local multi-node cluster:
+### Azure CLI Extensions
 
-```bash
-kind create cluster --config kind-config.yaml
+You need specific extensions to connect your local cluster to Azure Arc:
+
+```powershell
+az extension add --name connectedk8s
+az extension add --name k8s-configuration
 ```
 
-### 2. Configure Database Secrets (Security First)
+## 🚀 Step 1: Create the Local Cluster
 
-To prevent committing plaintext passwords to version control, we use the "Split and Ignore" method. 
-Create a file named `postgres-secret.yaml` in the root directory **(Ensure this file is in your `.gitignore`)**:
+First, clone this repository to your machine, then spin up the Kind cluster:
 
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: postgres-secret
-type: Opaque
-stringData:
-  POSTGRES_DB: springdb
-  POSTGRES_USER: springuser
-  POSTGRES_PASSWORD: supersecretpassword
+```powershell
+git clone [https://github.com/jukkamic/enterprise-kubernetes.git](https://github.com/jukkamic/enterprise-kubernetes.git)
+cd enterprise-kubernetes
+
+# Create the cluster using our custom config
+kind create cluster --name enterprise-cluster --config kind-config.yaml
+
+# Verify connection
+kubectl cluster-info --context kind-enterprise-cluster
 ```
 
-Apply the secret to the cluster:
+## ☁️ Step 2: Azure Key Vault & Service Principal
 
-```bash
-kubectl apply -f postgres-secret.yaml
+Your cluster needs a Key Vault to store secrets and an identity (Service Principal) to read them. Key Vault names must be globally unique, so we'll use a PowerShell trick to generate a random name.
+
+### 1\. Log in and Create Infrastructure
+
+```powershell
+az login
+# Save your Subscription ID from the output for the next steps!
+
+# Create the Resource Group
+az group create --name "Hybrid-Lab" --location "northeurope"
+
+# Generate a random Vault name and create it
+$VAULT_NAME = "hobby-vault-$(Get-Random)"
+az keyvault create --name $VAULT_NAME --resource-group "Hybrid-Lab" --location "northeurope" --enable-rbac-authorization
+
+Write-Host "Your Key Vault Name is: $VAULT_NAME"
 ```
 
-### 3. Deploy the Data Layer
+### 2. Create the Service Principal
 
-Deploy the centralized PostgreSQL database and its internal network service:
+Create an identity for your Kubernetes cluster to access the Key Vault. Replace `<YOUR_SUBSCRIPTION_ID>` with your actual ID.
 
-```bash
-kubectl apply -f postgres-infra.yaml
+```powershell
+az ad sp create-for-rbac --name "HobbyLabRobot" `
+  --role "Key Vault Secrets User" `
+  --scopes "/subscriptions/<YOUR_SUBSCRIPTION_ID>/resourceGroups/Hybrid-Lab/providers/Microsoft.KeyVault/vaults/$VAULT_NAME"
 ```
 
-### 4. Build and Deploy the Application
+> ⚠️ **CRITICAL: SAVE THIS OUTPUT\!**
+> The command will output a JSON block. **You must securely save the `appId`, `password`, and `tenant`.** You will need these to configure the Kubernetes CSI driver. If you lose the password, you must reset it.
 
-Build the Java application and package it into a Docker image:
+## 🔗 Step 3: Connect to Azure Arc
 
-```bash
-mvn clean package
-docker build -t spring-webapp:v3 .
+Now we project our local Kind cluster into Azure so it can be managed centrally.
+
+```powershell
+# Connect the cluster to Azure Arc
+az connectedk8s connect --name "enterprise-cluster-arc" --resource-group "Hybrid-Lab"
+
+# Verify the connection in Azure
+az connectedk8s show --name "enterprise-cluster-arc" --resource-group "Hybrid-Lab"
 ```
 
-Sideload the image directly into the `kind` cluster's registry:
+## ⚙️ Step 4: Install the Secret Provider CSI Driver
 
-```bash
-kind load docker-image spring-webapp:v3
+To inject secrets from Key Vault directly into your application pods, install the CSI driver via Helm.
+
+```powershell
+# Add the Helm repo and install
+helm repo add csi-secrets-store-provider-azure [https://azure.github.io/secrets-store-csi-driver-provider-azure/charts](https://azure.github.io/secrets-store-csi-driver-provider-azure/charts)
+helm repo update
+
+helm install csi csi-secrets-store-provider-azure/csi-secrets-store-provider-azure --namespace kube-system
 ```
 
-Deploy the Spring Boot application (2 Replicas):
+Provide the Service Principal credentials (from Step 2) to your cluster:
 
-```bash
-kubectl apply -f app-deployment.yaml
+```powershell
+# Replace with your saved App ID and Password
+kubectl create secret generic secrets-store-creds `
+  --from-literal clientid="<YOUR_APP_ID>" `
+  --from-literal clientsecret="<YOUR_PASSWORD>"
 ```
 
-### 5. Expose via Cloudflare Tunnel (In-Cluster Ingress)
+## 🔄 Step 5: Bootstrap Flux (GitOps)
 
-Instead of running a local client, the Cloudflare Zero Trust tunnel is deployed as a native Kubernetes Pod to securely route external traffic to the internal Service without opening local firewall ports:
-*(Note: Requires generating a tunnel token via the Cloudflare Dashboard)*
+Instead of manually applying YAML files, we use Flux to automatically sync our cluster state with this GitHub repository.
 
-```bash
-kubectl apply -f cloudflare-tunnel.yaml
+```powershell
+# Run the pre-flight checks
+flux check --pre
+
+# Bootstrap Flux into your cluster (replace with your GitHub username/repo details)
+flux bootstrap github `
+  --owner="jukkamic" `
+  --repository="enterprise-kubernetes" `
+  --branch="main" `
+  --path="./clusters/enterprise-cluster" `
+  --personal
 ```
 
-### 6. Connect to Azure Arc
+*Flux will now read the repository and automatically apply the Spring Boot application configurations, SecretProviderClass, and services.*
 
-Tether the cluster to Azure for enterprise monitoring:
+## 🌐 Step 6: Cloudflare Tunnel Routing
 
-```bash
-az connectedk8s connect --name my-enterprise-cluster --resource-group my-resource-group
-```
+To make your Spring Boot app accessible to the internet:
 
----
+1.  Authenticate your local cloudflared agent: `cloudflared tunnel login`
+2.  Create the tunnel: `cloudflared tunnel create local-k8s-tunnel`
+3.  Route your domain: `cloudflared tunnel route dns local-k8s-tunnel myapp.yourdomain.com`
+4.  Ensure your Cloudflare secret and deployment YAMLs are pushed to GitHub so Flux can apply them.
 
-## 🛠️ Useful Commands for Debugging
+## 🚑 Troubleshooting Common Enterprise Lab Issues
 
-**Check where pods are physically running (Node scheduling):**
+* **Check App Deployment:** `kubectl get pods -n default`
+* **Check Flux Sync Status:** `flux get kustomizations`
+* **Secrets Failing?** If pods are stuck in `ContainerCreating`, double-check that the `tenantId` and `keyvaultName` in your `SecretProviderClass.yaml` match the random `$VAULT_NAME` you generated, and that your Service Principal credentials are correct.
 
-```bash
-kubectl get pods -o wide
-```
+When combining this many enterprise tools locally, things can occasionally get tangled. Here are the most common issues and how to diagnose them:
 
-**Watch live, aggregated logs across all replicas (Proves load balancing):**
+### 1. Azure Arc Connection Drops
 
-```bash
-kubectl logs -f -l app=spring-webapp --prefix
-```
+If the Azure Portal shows your cluster as "Offline", the local Arc agents might have crashed or lost internet access from within your WSL/Docker environment.
+* **Check the Arc agents:**
+* 
+  ```powershell
+  kubectl get pods -n azure-arc
+  ```
+  *Ensure all pods are in a `Running` state. If any are `CrashLoopBackOff` or `Pending`, check their logs (`kubectl logs <pod-name> -n azure-arc`).*
 
-**Test High Availability (Chaos Engineering):**
+* **Force a sync:** Sometimes, simply deleting the `clusterconnect-agent` pod forces it to recreate and phone home successfully.
 
-```bash
-kubectl delete pod <pod-name>
-```
+### 2. Flux Isn't Syncing Your Changes
 
-*(Watch Kubernetes instantly spin up a replacement without dropping the application's uptime).*
+You pushed a YAML change to GitHub, but your local cluster isn't updating.
+* **Check the overall Flux status:**
+  ```powershell
+  flux get all
+  ```
+  *Look for any `Ready` states that say `False` or show a specific error message under the `Message` column.*
+
+* **Check the Flux logs:** This is the best way to see exactly what YAML syntax error or missing reference is blocking the reconciliation:
+  ```powershell
+  flux logs --level=error --all-namespaces
+  ```
+
+### 3. Pods Stuck in `ContainerCreating` (Key Vault Issues)
+
+This is the classic symptom of the CSI driver failing to mount your Azure Key Vault secrets.
+
+* **Inspect the pod events:**
+  ```powershell
+  kubectl describe pod <your-spring-boot-pod-name>
+  ```
+  *Scroll down to the `Events` section at the very bottom. You will usually see a detailed error message from the `secrets-store-csi-driver`.*
+
+* **The Usual Suspects:** 
+  * Your `appId` or `password` in the `secrets-store-creds` Kubernetes secret is incorrect.
+  * The `tenantId` in your `SecretProviderClass.yaml` doesn't match your Azure tenant.
+  * The `keyvaultName` in your `SecretProviderClass.yaml` doesn't exactly match the random `$VAULT_NAME` you generated earlier.
+  * The Service Principal lacks the "Key Vault Secrets User" role on your new Key Vault.
+
+### 4. Cloudflare Tunnel is Offline (502 Bad Gateway)
+
+Your custom domain is failing to route traffic to your local Spring Boot app.
+
+* **Check the Cloudflare pod logs:**
+  ```powershell
+  # Find your cloudflared pod (adjust namespace if needed)
+  kubectl get pods -l app=cloudflared
+  
+  # Check the logs for connection errors
+  kubectl logs -l app=cloudflared
+  ```
+  *Look for authentication errors, invalid tunnel tokens, or failures to reach the Cloudflare edge network.*
