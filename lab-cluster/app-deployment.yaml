@@ -53,6 +53,8 @@ spec:
             readOnly: true
             volumeAttributes:
               secretProviderClass: "hobby-vault-provider"
+            nodePublishSecretRef:
+              name: secrets-store-creds
 
 ---
 # 2. The Service (The stable internal network address)
