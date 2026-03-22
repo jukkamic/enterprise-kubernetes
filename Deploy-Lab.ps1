@@ -3,7 +3,7 @@ $RG_NAME = "Hybrid-Lab"
 $CLUSTER_NAME = "hobby-lab"
 $LOCATION = "northeurope"
 $GIT_URL = "https://github.com/jukkamic/enterprise-kubernetes.git"
-$GIT_BRANCH = "feat/arc-secrets"
+$GIT_BRANCH = "main"
 
 Write-Host "Starting Hybrid-Lab reconstruction..." -ForegroundColor Cyan
 

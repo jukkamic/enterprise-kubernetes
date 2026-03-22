@@ -1,6 +1,8 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+namespace: default
+
 # List ONLY the files you want Flux to deploy
 resources:
   - secret-provider.yaml
