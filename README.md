@@ -135,8 +135,8 @@ az k8s-configuration flux create `
   --namespace flux-system `
   --url [https://github.com/jukkamic/enterprise-kubernetes](https://github.com/jukkamic/enterprise-kubernetes) `
   --branch main `
-  --kustomization name=lab-cluster path=./lab-cluster sync_interval=1m `
-  --kustomization name=flux-system path=./clusters/hobby-lab/flux-system sync_interval=1m
+  --kustomization name=lab-cluster path=./lab-cluster sync_interval=1m retry_interval=1m`
+  --kustomization name=flux-system path=./clusters/hobby-lab/flux-system sync_interval=1m retry_interval=1m
 ```
 Azure will now quietly install Flux into your cluster and begin syncing your Spring Boot application and configurations.
 
