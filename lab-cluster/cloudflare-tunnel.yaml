@@ -36,3 +36,5 @@ spec:
             readOnly: true
             volumeAttributes:
               secretProviderClass: "hobby-vault-provider"
+            nodePublishSecretRef:
+              name: secrets-store-creds
