@@ -19,9 +19,21 @@ Add Azure resource groups
 az group create --name Hybrid-Lab --location northeurope
 ```
 
-The extensions and providers
+## The extensions and providers
 
-(See [Getting Started Phase 8](01-getting-started.md))
+This tells the Azure CLI: "I’m a hobbyist, I know these are preview features, go ahead and install them."
+
+```bash
+az config set extension.dynamic_install_allow_preview=true
+```
+
+Register this provider 
+
+```bash
+az provider register --namespace Microsoft.OperationalInsights
+```
+
+and for the other providers see [Getting Started Phase 8](01-getting-started.md)
 
 ## Create
 
