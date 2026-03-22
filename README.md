@@ -70,6 +70,8 @@ az keyvault create --name $VAULT_NAME --resource-group "Hybrid-Lab" --location "
 Write-Host "Your Key Vault Name is: $VAULT_NAME"
 ```
 
+**⚠️ Note:** Write down your vault name.
+
 ### 2. Create the Service Principal
 
 Create an identity for your Kubernetes cluster to access the Key Vault. Replace `<YOUR_SUBSCRIPTION_ID>` with your actual ID.
@@ -89,10 +91,13 @@ Now we project our local Kind cluster into Azure so it can be managed centrally.
 
 ```powershell
 # Connect the cluster to Azure Arc
-az connectedk8s connect --name "enterprise-cluster-arc" --resource-group "Hybrid-Lab"
+az connectedk8s connect --name "hobby-lab" --resource-group "Hybrid-Lab" --location "northeurope"
+
+# If it already exists, you may delete with 
+# az connectedk8s delete --name "hobby-lab" --resource-group "Hybrid-Lab" --yes
 
 # Verify the connection in Azure
-az connectedk8s show --name "enterprise-cluster-arc" --resource-group "Hybrid-Lab"
+az connectedk8s show --name "hobby-lab" --resource-group "Hybrid-Lab"
 ```
 
 ## ⚙️ Step 4: Install the Secret Provider CSI Driver
@@ -116,24 +121,24 @@ kubectl create secret generic secrets-store-creds `
   --from-literal clientsecret="<YOUR_PASSWORD>"
 ```
 
-## 🔄 Step 5: Bootstrap Flux (GitOps)
+## 🔄 Step 5: Bootstrap Flux (GitOps) via Azure Arc
 
-Instead of manually applying YAML files, we use Flux to automatically sync our cluster state with this GitHub repository.
+Since our cluster is managed by Azure Arc, we will use Azure's managed Flux extension rather than the local CLI. This command installs the Flux agents and points them to our GitHub repository.
 
 ```powershell
-# Run the pre-flight checks
-flux check --pre
-
-# Bootstrap Flux into your cluster (replace with your GitHub username/repo details)
-flux bootstrap github `
-  --owner="jukkamic" `
-  --repository="enterprise-kubernetes" `
-  --branch="main" `
-  --path="./clusters/enterprise-cluster" `
-  --personal
+az k8s-configuration flux create `
+  --name hobby-lab-gitops `
+  --cluster-name hobby-lab `
+  --resource-group "Hybrid-Lab" `
+  --cluster-type connectedClusters `
+  --scope cluster `
+  --namespace flux-system `
+  --url [https://github.com/jukkamic/enterprise-kubernetes](https://github.com/jukkamic/enterprise-kubernetes) `
+  --branch main `
+  --kustomization name=lab-cluster path=./lab-cluster sync_interval=1m `
+  --kustomization name=flux-system path=./clusters/hobby-lab/flux-system sync_interval=1m
 ```
-
-*Flux will now read the repository and automatically apply the Spring Boot application configurations, SecretProviderClass, and services.*
+Azure will now quietly install Flux into your cluster and begin syncing your Spring Boot application and configurations.
 
 ## 🌐 Step 6: Cloudflare Tunnel Routing
 
@@ -149,7 +154,8 @@ To make your Spring Boot app accessible to the internet:
 * **Check App Deployment:** `kubectl get pods -n default`
 * **Check Flux Sync Status:** `flux get kustomizations`
 * **Secrets Failing?** If pods are stuck in `ContainerCreating`, double-check that the `tenantId` and `keyvaultName` in your `SecretProviderClass.yaml` match the random `$VAULT_NAME` you generated, and that your Service Principal credentials are correct.
-
+* **SUBSCRIPTION_ID?** ```az account show --query id --output tsv```
+  
 When combining this many enterprise tools locally, things can occasionally get tangled. Here are the most common issues and how to diagnose them:
 
 ### 1. Azure Arc Connection Drops
@@ -207,3 +213,16 @@ Your custom domain is failing to route traffic to your local Spring Boot app.
   kubectl logs -l app=cloudflared
   ```
   *Look for authentication errors, invalid tunnel tokens, or failures to reach the Cloudflare edge network.*
+
+### 5. Service account token
+
+```powershell
+# 1. Create a service account (a user) for the Azure Portal
+kubectl create serviceaccount azure-user
+
+# 2. Give that user admin rights to see everything (it's a local lab, so we're keeping it simple)
+kubectl create clusterrolebinding azure-user-binding --clusterrole cluster-admin --serviceaccount default:azure-user
+
+# 3. Generate the token (making it valid for a year so you don't have to do this again)
+kubectl create token azure-user --duration=8760h
+```
