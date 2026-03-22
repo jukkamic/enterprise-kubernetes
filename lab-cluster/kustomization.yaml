@@ -3,7 +3,7 @@ kind: Kustomization
 
 # List ONLY the files you want Flux to deploy
 resources:
-  - postgres-secret.yaml
+  - secret-provider.yaml
   - postgres-infra.yaml
   - cloudflare-tunnel.yaml
   - app-deployment.yaml

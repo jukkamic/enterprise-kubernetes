@@ -16,6 +16,10 @@ spec:
     spec:
       containers:
         - name: spring-webapp
+          volumeMounts:
+            - name: secrets-store-inline
+              mountPath: "/mnt/secrets-store"
+              readOnly: true
           image: spring-webapp:v3
           imagePullPolicy: Never # Tells K8s to use the sideloaded image, not the internet
           ports:
@@ -32,7 +36,7 @@ spec:
             - name: SPRING_JPA_DATABASE_PLATFORM
               value: "org.hibernate.dialect.PostgreSQLDialect"
             # Securely pulling the credentials from the Kubernetes Secret
-            - name: DB_USERNAME 
+            - name: DB_USERNAME
               valueFrom:
                 secretKeyRef:
                   name: postgres-secret
@@ -42,6 +46,13 @@ spec:
                 secretKeyRef:
                   name: postgres-secret
                   key: POSTGRES_PASSWORD
+      volumes:
+        - name: secrets-store-inline
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "hobby-vault-provider"
 
 ---
 # 2. The Service (The stable internal network address)
