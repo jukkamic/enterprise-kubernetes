@@ -171,13 +171,13 @@ Note: This step happens entirely on Microsoft's end and can take 3 to 10 minutes
 Create home for your cluster
 
 ```bash
-az group create --name Arc-Interview-Demo --location eastus
+az group create --name Hybrid-Lab --location northeurope
 ```
 
 Deploy Azure Arc agents (pods) in to your kind cluster and establish an encrypted outbound tunnel to Azure
 
 ```bash
-az connectedk8s connect --name my-kind-cluster --resource-group Arc-Interview-Demo
+az connectedk8s connect --name my-kind-cluster --resource-group Hybrid-Lab
 ```
 
 Verify and view
